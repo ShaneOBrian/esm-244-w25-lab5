@@ -79,10 +79,6 @@ temp<-read_tsv(here::here('data','seeds_dataset.txt'),
 ```
 In your console use `summary(temp)` to examine the structure of the data. Does anything look strange?
 
-
-
-
-
 Hopefully you caught two pieces that need to be fixed. First, why are there so many -999 minimum values? That is an oddly specific number. Those are how `NAs` were defined in the data. We need to let R know that those numbers are actually not numbers at all. Second, variety is really a factor, not a number so let's change it to the names of the species.
 
 ```{r}
@@ -95,8 +91,6 @@ seeds_df <- read_tsv(here::here('data','seeds_dataset.txt'),
                              variety == 3 ~ 'Canadian',
                              TRUE ~ 'oops'))
 ```
-
-
 
 ## Exploratory visualization
 

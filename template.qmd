@@ -1,9 +1,18 @@
 ---
-title: 'ESM 244 Lab 5 Key: Clustering'
+title: 'ESM 244 Lab 5: Clustering'
+author: 
+  - Shane
+format:
+  html:
+    code-fold: show
+    embed-resources: true
+    toc: true
 execute:
-  eval: false
+  eval: true
+  warming: false
+  message: false
+  
 ---
-
 
 In this lab, you'll learn how to do some cluster exploration by partition-based (k-means) and hierarchical clustering.
 
@@ -14,7 +23,7 @@ Note: You'll probably need to install the last 5 packages here for clustering.
 ```{r}
 library(tidyverse)
 library(patchwork)
-
+library(ggplot2)
 # Packages for cluster analysis:
 library(NbClust)
 library(cluster)
@@ -58,39 +67,38 @@ This data is in a different format than we are used to.  It is a text file, rath
 
 ```{r}
 seeds_df <- read_tsv(here::here('data','seeds_dataset.txt'))
-
 ```
 
 Uh-oh, the column names look strange. Why are there no column names?  We can tell R that there are no column names in the `read_tsv()`, but we'll need to manually add them in based on our reading of the metadata. Let's start by making a vector for the names. Notice the order of the vector matters in the placement of the column names. First index goes to first column.
 
 ```{r}
+# making a vector of what we want the column names. 
 var_names<-c('a', 'p', 'c', 'l_k', 'w_k', 'asym', 'l_g', 'variety')
 temp<-read_tsv(here::here('data','seeds_dataset.txt'),
+               #col_names = FALSE means there are no column names currently in the data frame
                      col_names = FALSE) |> 
+  #just the names to the variable names in the created vector, has to match in number
   setNames(var_names)
 ```
 
 
 In your console use `summary(temp)` to examine the structure of the data. Does anything look strange?
-
-
-
-
+-999.00 values. variety is classed as a number in the data frame
 
 Hopefully you caught two pieces that need to be fixed. First, why are there so many -999 minimum values? That is an oddly specific number. Those are how `NAs` were defined in the data. We need to let R know that those numbers are actually not numbers at all. Second, variety is really a factor, not a number so let's change it to the names of the species.
 
 ```{r}
 seeds_df <- read_tsv(here::here('data','seeds_dataset.txt'),
                      col_names = FALSE,
+                     # na = '-999 we're telling r that this specific value (-999.00) is representing NA
                      na = '-999') %>%
   setNames(var_names) %>%
+  #in the column variety, if something is exactly equal to 1, it should be Kama, ect, if there's not a value outside of 1, 2, 3, make variety oops
   mutate(variety = case_when(variety == 1 ~ 'Kama',
                              variety == 2 ~ 'Rosa',
                              variety == 3 ~ 'Canadian',
                              TRUE ~ 'oops'))
 ```
-
-
 
 ## Exploratory visualization
 
@@ -105,19 +113,51 @@ I want you to create three exploratory visuals to help you understand the data a
 You can always make more if you want. 
 
 
+```{r}
+#histogram
+a_histogram <- ggplot(seeds_df, aes(x = a)) + 
+  geom_histogram()  # This will create a histogram of the 'a' variable
+a_histogram
 
+p_histogram <- ggplot(seeds_df, aes(x = p)) + 
+  geom_histogram()  # This will create a histogram of the 'a' variable
+p_histogram
 
+lk_histogram <- ggplot(seeds_df, aes(x = l_k)) + 
+  geom_histogram()  # This will create a histogram of the 'a' variable
+lk_histogram
 
+kernal_a <- ggplot(seeds_df, aes(x = a, y = asym))+
+  geom_point()
+kernal_a
 
+kernal_lk <- ggplot(seeds_df, aes(x = l_k, y = asym))+
+  geom_point()
+kernal_lk
 
+kernal_lk <- ggplot(seeds_df, aes(x = l_k, y = asym))+
+  geom_point()
+kernal_lk
+```
 
 
 ## Create a complete, scaled version of the data
 
 Make two separate dataframes where one is the complete cases dataframe and the other is the scaled complete cases. Check out the `scale()` function.
 
-Why would we want two separate dataframes instead of doing it one pipe? Why should we scale the data before going to kmeans-clustering?
+```{r}
+seeds_complete <- seeds_df |>
+  #drop na drops any rows with na values from the data frame
+  drop_na()
 
+seeds_scale <- seeds_complete |>
+  #select and then remove (-) the variety column from the data frame
+  select(-variety) |> 
+  # For each numeric column, the mean of the column is subtracted from every value in that column
+  scale() 
+```
+
+Why would we want two separate dataframes instead of doing it one pipe? Why should we scale the data before going to kmeans-clustering?
 
 
 
@@ -126,7 +166,7 @@ Why would we want two separate dataframes instead of doing it one pipe? Why shou
 First let's make a 'knee' plot to see the performance of kmeans with different number of clusters. Describe what each of the arguments do in the following code chunk. Interpret the results of the graph by making a figure caption in the code chunk.
 
 ```{r}
-
+#| fig-cap: Deeze
 fviz_nbclust(seeds_scale, FUNcluster = kmeans, method = 'wss', k.max = 10)
 
 ```
@@ -139,15 +179,12 @@ Now let's have R recommend the number of clusters.
 ```{r}
 
 number_est <- NbClust(seeds_scale, min.nc = 2, max.nc = 10, method = "kmeans")
-
+#take the scaled data, and then what's the range of clusters we think exists in the data. minimum of 2, maxiumum of 10. 
 
 number_est
 
 
 ```
-
-
-
 
 
 ## Run k-means 
@@ -157,11 +194,20 @@ The `nbclust` package runs k-means under the hood, but doesn't provide a usuable
 ```{r}
 
 set.seed(10101)
-seeds_km <- kmeans(xxx,yyy,zzz) # kmeans specifying 3 groups to start
+seeds_km <- kmeans(seeds_scale, 3, nstart = 25) 
+# 
+# kmeans specifying 3 groups to start
 ```
 
 
 Examine the output of the kmeans object. Which column contains the classfiication? Join the cluster labels to the ***non***-scaled data.
+
+```{r}
+# mmake a new data frame called seeds_cl using data from the seeds_complete dataframe
+seeds_cl <- data.frame(seeds_complete,
+                       cluster_num = factor(seeds_km$cluster))
+```
+
 
 
 
@@ -171,14 +217,28 @@ Now make a ggplot of of area on the x-axis, asymmetric coefficient on the y-axis
 ### On your own:
 ### Plot area and asymmetric index, and include cluster number and variety for comparison:
 
+a_histogram <- ggplot(seeds_cl, aes(x = a, color = cluster_num)) + 
+  geom_histogram()  # This will create a histogram of the 'a' variable
+a_histogram
 
 
+kernal_lk <- ggplot(seeds_cl, aes(x = l_k, y = asym, color = cluster_num))+
+  geom_point()
+kernal_lk
 ```
 
 What do we see from this graph? 
 
 
 Can you make a table to show the comparison between the variety and defined clusters?
+
+```{r}
+#| tlb-cap: contiency table for the groups of kmeans and the varietals of kernels
+seeds_cl |>
+  select(variety, cluster_num) |>
+  table()|>
+  knitr::kable()
+```
 
 
 
@@ -205,16 +265,23 @@ wb_env <- read_csv(here::here("data","wb_env.csv"))
 
 Write pseducode for what we will need to do for heirarchal clustering
 
-
-
+1. get the top 20 emmitters
+2. drop na values if any
+3. select only numeric
+4. scale data
+5. distance of scaled data
+6. run hclust
+7. linkages either single or complete
+8. make dendograms
 
 ## Wrangle the data
 
 ```{r}
-#| eval: false
 
 # Only keep top 20 greenhouse gas emitters (for simplifying visualization here...)
-wb_ghg_20 <- wb_env %>% 
+wb_ghg_20 <- wb_env |>
+  #from the ghg column, take the top 20 values
+  slice_max(ghg, n=20)
   
 
 ```
@@ -223,9 +290,12 @@ wb_ghg_20 <- wb_env %>%
 
 ```{r}
 # Scale the numeric variables (columns 3:7)
-wb_scaled <- wb_ghg_20 %>% 
+wb_scaled <- wb_ghg_20 |>
+  #remove the nonnumeric columns
+  select(-name, -region )|>
+  scale()
 
-
+#name the rows based on the name from the name column
 rownames(wb_scaled) <- wb_ghg_20$name
 
 ```
@@ -236,7 +306,8 @@ rownames(wb_scaled) <- wb_ghg_20$name
 Use the `stats::dist()` function to find the Euclidean distance in multivariate space between the different observations (countries):
 
 ```{r}
-
+#dist(x, method = "euclidean", diag = FALSE, upper = FALSE, p = 2)
+euc_distance <- dist(wb_scaled,method='euclidean')
 ```
 
 
@@ -251,6 +322,7 @@ Here, let's use complete linkage (recall from lecture: clusters are merged by th
 
 # Hierarchical clustering (complete linkage)
 hc_complete <- hclust(euc_distance, method = "complete" )
+hc_single <- hclust(euc_distance, method = "single")
 
 # Plot it
 p_complete<-ggdendrogram(hc_complete, 
@@ -258,7 +330,19 @@ p_complete<-ggdendrogram(hc_complete,
   theme_minimal() +
   labs(x = "Country")
 
+p_single<-ggdendrogram(hc_single, 
+             rotate = TRUE) +
+  theme_minimal() +
+  labs(x = "Country")
+
+p_complete
+p_single
+
 ```
+
+```
+
+
 
 ## Now let's do it by single linkage & compare
 
